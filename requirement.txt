@@ -4,3 +4,7 @@ python-dotenv
 djongo
 requests
 django-cors-headers
+bcrypt
+Django
+pymongo
+certifi

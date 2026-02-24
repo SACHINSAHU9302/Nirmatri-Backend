@@ -13,6 +13,16 @@ from pymongo.errors import ConnectionFailure, ConfigurationError
 from dotenv import load_dotenv
 import certifi
 
+
+MONGO_URI = os.getenv("MONGO_URI")
+
+client = MongoClient(MONGO_URI)
+
+db = client["nirmatriDB"]
+
+# ✅ ADD THIS
+users_collection = db["users"]
+
 # Load environment variables
 load_dotenv()
 
@@ -131,3 +141,8 @@ def get_client() -> MongoClient:
 # Backward compatibility (safe)
 db = get_db()
 client = get_client()
+
+from .connection import db
+
+superadmin_collection = db["superadmins"]
+sellers_collection = db["sellers"]

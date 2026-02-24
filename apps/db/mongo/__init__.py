@@ -7,6 +7,7 @@ Central export point for database layer
 # ===============================
 # CONNECTION
 # ===============================
+from apps.db.mongo.db_collections import sellers_collection
 from .connection import mongo_connection, db, client
 
 

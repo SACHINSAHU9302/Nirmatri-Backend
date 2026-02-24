@@ -248,6 +248,26 @@ DATABASE_SCHEMAS = {
         "created_at": "datetime",
         "updated_at": "datetime",
     },
+     "sellers": {
+        "_id": "ObjectId",
+        "user_id": "ObjectId",
+        "store_info": "object",
+        "kyc": "object",
+        "bank": "object",
+        "phone": "string",
+        "agreed": "boolean",
+        "status": "pending | approved | rejected",
+        "created_at": "datetime",
+        "updated_at": "datetime",
+    },
+    "admin": {
+        "_id": "ObjectId",
+        "name": "string",
+        "email": "string",
+        "password": "string",
+        "role": "string",
+        "created_at": "datetime",
+    },
 }
 
 
@@ -264,6 +284,7 @@ def validate_document_schema(collection: str, document: Dict[str, Any]) -> bool:
         "users": {"email", "name"},
         "products": {"name", "description", "price", "stock", "seller_id"},
         "orders": {"user_id", "product_ids", "total_amount"},
+        "sellers": {"user_id", "store_info", "kyc", "bank", "phone"},
     }.get(collection, set())
 
     for field in required:
@@ -273,3 +294,73 @@ def validate_document_schema(collection: str, document: Dict[str, Any]) -> bool:
             )
 
     return True
+
+# ======================================================
+# Seller Model (NEW)
+# ======================================================
+
+@dataclass
+class SellerModel:
+    user_id: str
+    store_info: Dict[str, Any]
+    kyc: Dict[str, Any]
+    bank: Dict[str, Any]
+    phone: str
+    agreed: bool
+    status: str = "pending"
+    created_at: Optional[datetime] = None
+    updated_at: Optional[datetime] = None
+
+    def validate(self) -> None:
+
+        if not self.user_id:
+            raise ValidationError("User ID is required")
+
+        if not self.phone or len(self.phone) < 10:
+            raise ValidationError("Valid phone number required")
+
+        if not isinstance(self.store_info, dict):
+            raise ValidationError("Store info required")
+
+        if not isinstance(self.kyc, dict):
+            raise ValidationError("KYC details required")
+
+        if not isinstance(self.bank, dict):
+            raise ValidationError("Bank details required")
+
+        if self.agreed is not True:
+            raise ValidationError("Terms & Conditions must be accepted")
+
+        if self.status not in {"pending", "approved", "rejected"}:
+            raise ValidationError("Invalid seller status")
+
+    def to_dict(self) -> Dict[str, Any]:
+        self.validate()
+
+        now = datetime.utcnow()
+
+        return {
+            "user_id": self.user_id,
+            "store_info": self.store_info,
+            "kyc": self.kyc,
+            "bank": self.bank,
+            "phone": self.phone,
+            "agreed": self.agreed,
+            "status": self.status,
+            "created_at": self.created_at or now,
+            "updated_at": self.updated_at or now,
+        }
+
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any]) -> "SellerModel":
+        return cls(
+            user_id=data.get("user_id", ""),
+            store_info=data.get("store_info", {}),
+            kyc=data.get("kyc", {}),
+            bank=data.get("bank", {}),
+            phone=data.get("phone", ""),
+            agreed=data.get("agreed", False),
+            status=data.get("status", "pending"),
+            created_at=data.get("created_at"),
+            updated_at=data.get("updated_at"),
+        )

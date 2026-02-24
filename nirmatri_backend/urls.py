@@ -20,8 +20,8 @@ from authapp.views import login, register
 
 urlpatterns = [
     path("api/auth/", include("authapp.urls")),
+    path("api/seller/", include("apps.sellers.urls")),
     path("admin/", admin.site.urls),
     path("", include("apps.core.urls")),
-    path("api/auth/", include("authapp.urls")),
+    path("api/admin/", include("apps.superadmin.urls")),
 ]
-

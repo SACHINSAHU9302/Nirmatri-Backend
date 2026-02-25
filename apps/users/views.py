@@ -1,14 +1,19 @@
 import json
 import bcrypt
+import jwt
+
 from django.http import JsonResponse
 from django.views.decorators.csrf import csrf_exempt
-from .services import verify_google_token
-from .models import User
+from django.conf import settings
+
 from apps.db.mongo.connection import users_collection
 from apps.users.utils import create_jwt_token
 
+
+# ================= USER LOGIN =================
 @csrf_exempt
 def user_login(request):
+
     if request.method == "POST":
         data = json.loads(request.body)
 
@@ -35,9 +40,69 @@ def user_login(request):
             }
         })
 
-from django.http import JsonResponse
-from django.views.decorators.csrf import csrf_exempt
-import json
+    return JsonResponse({"error": "Invalid method"}, status=405)
+
+
+# ================= GET PROFILE =================
+@csrf_exempt
+def get_profile(request):
+
+    try:
+        auth_header = request.headers.get("Authorization")
+
+        if not auth_header:
+            return JsonResponse({"error": "Token missing"}, status=401)
+
+        token = auth_header.split(" ")[1]
+
+        decoded = jwt.decode(token, settings.SECRET_KEY, algorithms=["HS256"])
+        user_id = decoded.get("user_id")
+
+        user = users_collection.find_one({"_id": user_id})
+
+        if not user:
+            return JsonResponse({"error": "User not found"}, status=404)
+
+        return JsonResponse({
+            "id": str(user["_id"]),
+            "name": user.get("name"),
+            "email": user.get("email"),
+            "phone": user.get("phone"),
+            "gender": user.get("gender"),
+            "firstName": user.get("firstName"),
+            "lastName": user.get("lastName"),
+        })
+
+    except Exception as e:
+        return JsonResponse({"error": str(e)}, status=500)
+
+
+# ================= UPDATE PROFILE =================
+@csrf_exempt
+def update_profile(request):
+
+    if request.method == "PUT":
+
+        auth_header = request.headers.get("Authorization")
+
+        if not auth_header:
+            return JsonResponse({"error": "Token missing"}, status=401)
+
+        token = auth_header.split(" ")[1]
+
+        decoded = jwt.decode(token, settings.SECRET_KEY, algorithms=["HS256"])
+        user_id = decoded.get("user_id")
+
+        data = json.loads(request.body)
+
+        users_collection.update_one(
+            {"_id": user_id},
+            {"$set": data}
+        )
+
+        return JsonResponse({"message": "Profile updated successfully"})
+
+    return JsonResponse({"error": "Invalid method"}, status=405)
 
 
 # ================= USER LOGIN =================

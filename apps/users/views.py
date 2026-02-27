@@ -1,7 +1,9 @@
 import json
+import token
 import bcrypt
 import jwt
 
+from bson import ObjectId
 from django.http import JsonResponse
 from django.views.decorators.csrf import csrf_exempt
 from django.conf import settings
@@ -46,37 +48,55 @@ def user_login(request):
 # ================= GET PROFILE =================
 @csrf_exempt
 def get_profile(request):
-
     try:
         auth_header = request.headers.get("Authorization")
 
         if not auth_header:
             return JsonResponse({"error": "Token missing"}, status=401)
 
+        if not auth_header.startswith("Bearer "):
+            return JsonResponse({"error": "Invalid token format"}, status=401)
+
         token = auth_header.split(" ")[1]
 
-        decoded = jwt.decode(token, settings.SECRET_KEY, algorithms=["HS256"])
+        # Decode JWT
+        try:
+            decoded = jwt.decode(token, settings.SECRET_KEY, algorithms=["HS256"])
+        except jwt.ExpiredSignatureError:
+            return JsonResponse({"error": "Token expired"}, status=401)
+        except jwt.InvalidTokenError:
+            return JsonResponse({"error": "Invalid token"}, status=401)
+
         user_id = decoded.get("user_id")
 
-        user = users_collection.find_one({"_id": user_id})
+        if not user_id:
+            return JsonResponse({"error": "Invalid token payload"}, status=401)
+
+        # Convert to ObjectId safely
+        try:
+            user_obj_id = ObjectId(user_id)
+        except Exception:
+            return JsonResponse({"error": "Invalid user id"}, status=400)
+
+        user = users_collection.find_one({"_id": user_obj_id})
 
         if not user:
             return JsonResponse({"error": "User not found"}, status=404)
 
         return JsonResponse({
             "id": str(user["_id"]),
-            "name": user.get("name"),
+            "firstName": user.get("firstName"),
+            "lastName": user.get("lastName"),
             "email": user.get("email"),
             "phone": user.get("phone"),
             "gender": user.get("gender"),
-            "firstName": user.get("firstName"),
-            "lastName": user.get("lastName"),
         })
 
     except Exception as e:
-        return JsonResponse({"error": str(e)}, status=500)
+        print("PROFILE ERROR:", str(e))   # 👈 check terminal
+        return JsonResponse({"error": "Server error"}, status=500)
 
-
+print("TOKEN:", token)
 # ================= UPDATE PROFILE =================
 @csrf_exempt
 def update_profile(request):

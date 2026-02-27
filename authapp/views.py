@@ -36,25 +36,28 @@ def register(request):
     try:
         data = json.loads(request.body)
 
-        first_name = data.get("first_name")
-        last_name = data.get("last_name")
+        first_name = data.get("firstName")
+        last_name = data.get("lastName")
         email = data.get("email")
         password = data.get("password")
 
         if not all([first_name, last_name, email, password]):
             return JsonResponse({"error": "All fields are required"}, status=400)
 
-        # ✅ normalize email
         email = email.lower()
 
         if users_collection.find_one({"email": email}):
             return JsonResponse({"error": "Email already registered"}, status=400)
 
+        from datetime import datetime
+
         user = {
-            "first_name": first_name,
-            "last_name": last_name,
+            "firstName": first_name,   # 🔥 camelCase
+            "lastName": last_name,
             "email": email,
             "password": hash_password(password),
+            "phone": "",               # default empty (important)
+            "gender": "",
             "role": "user",
             "is_active": True,
             "created_at": datetime.utcnow()
@@ -67,9 +70,8 @@ def register(request):
             status=201
         )
 
-    except Exception:
-        return JsonResponse({"error": "Registration failed"}, status=500)
-
+    except Exception as e:
+        return JsonResponse({"error": str(e)}, status=500)
 
 # ===============================
 # LOGIN API (TOKEN BASED)
@@ -155,9 +157,6 @@ def login(request):
     from django.http import JsonResponse
 from django.views.decorators.csrf import csrf_exempt
 
-@csrf_exempt
-def login(request):
-    return JsonResponse({"message": "LOGIN API HIT"}, status=200)
 
 
 # ===============================
@@ -267,3 +266,6 @@ def reset_password(request):
     except Exception:
         return JsonResponse({"error": "Password reset failed"}, status=500)
 
+@csrf_exempt
+def login(request):
+    return JsonResponse({"message": "LOGIN API HIT"}, status=200)

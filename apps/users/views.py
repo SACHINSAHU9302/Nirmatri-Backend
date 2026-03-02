@@ -7,7 +7,7 @@ from bson import ObjectId
 from django.http import JsonResponse
 from django.views.decorators.csrf import csrf_exempt
 from django.conf import settings
-
+from bson import ObjectId
 from apps.db.mongo.connection import users_collection
 from apps.users.utils import create_jwt_token
 
@@ -44,6 +44,55 @@ def user_login(request):
 
     return JsonResponse({"error": "Invalid method"}, status=405)
 
+@csrf_exempt
+def user_register(request):
+    if request.method != "POST":
+        return JsonResponse({"error": "Invalid method"}, status=405)
+
+    try:
+        data = json.loads(request.body)
+
+        name = data.get("name")
+        email = data.get("email")
+        password = data.get("password")
+
+
+        if not name or not email or not password:
+            return JsonResponse({"error": "All fields are required"}, status=400)
+
+        # Check if user already exists
+        existing_user = users_collection.find_one({"email": email})
+        if existing_user:
+            return JsonResponse({"error": "User already exists"}, status=400)
+
+        # Hash password
+        hashed_password = bcrypt.hashpw(password.encode(), bcrypt.gensalt())
+
+        # Insert user
+        result = users_collection.insert_one({
+            "name": name,
+            "email": email,
+            "password": hashed_password.decode(),
+        })
+
+        user_id = str(result.inserted_id)
+
+        # Create JWT
+        token = create_jwt_token(user_id)
+
+        return JsonResponse({
+            "message": "User registered successfully",
+            "token": token,
+            "user": {
+                "id": user_id,
+                "name": name,
+                "email": email,
+            }
+        }, status=201)
+
+    except Exception as e:
+        return JsonResponse({"error": str(e)}, status=500)
+
 
 # ================= GET PROFILE =================
 @csrf_exempt
@@ -51,8 +100,8 @@ def get_profile(request):
     try:
         auth_header = request.headers.get("Authorization")
 
-        if not auth_header:
-            return JsonResponse({"error": "Token missing"}, status=401)
+        if not auth_header.startswith("Bearer "):
+            return JsonResponse({"error": "Invalid token format"}, status=401)
 
         if not auth_header.startswith("Bearer "):
             return JsonResponse({"error": "Invalid token format"}, status=401)
@@ -79,6 +128,8 @@ def get_profile(request):
             return JsonResponse({"error": "Invalid user id"}, status=400)
 
         user = users_collection.find_one({"_id": user_obj_id})
+
+        user = users_collection.find_one({"_id": ObjectId(user_id)})
 
         if not user:
             return JsonResponse({"error": "User not found"}, status=404)
@@ -126,20 +177,6 @@ def update_profile(request):
 
 
 # ================= USER LOGIN =================
-@csrf_exempt
-def user_login(request):
-    if request.method == "POST":
-        return JsonResponse({"message": "User login API working"})
-    return JsonResponse({"error": "Invalid method"}, status=405)
-
-
-# ================= USER REGISTER =================
-@csrf_exempt
-def user_register(request):
-    if request.method == "POST":
-        return JsonResponse({"message": "User register API working"})
-    return JsonResponse({"error": "Invalid method"}, status=405)
-
 
 # ================= FORGOT PASSWORD =================
 @csrf_exempt

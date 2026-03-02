@@ -10,4 +10,4 @@ Django
 pymongo
 certifi
 jwt
- PyJWT
+PyJWT

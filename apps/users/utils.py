@@ -44,6 +44,8 @@ def decode_jwt_token(token):
             algorithms=["HS256"]
         )
         return payload
+    
+    
 
     except jwt.InvalidTokenError:
         return {"error": "Invalid token"}

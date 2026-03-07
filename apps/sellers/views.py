@@ -3,18 +3,23 @@ import json
 from django.http import JsonResponse
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_POST
-# ...existing code...
-# replace:
-from apps.db.mongo import sellers_collection
-# with:
 from apps.db.mongo.db_collections import sellers_collection
-# ...existing code...
+from apps.sellers.services import seller_login_service
 from datetime import datetime
-from .services import seller_login
-from .services import seller_login_service
 
 
 #register API
+@csrf_exempt
+def seller_login(request):
+
+    if request.method != "POST":
+        return JsonResponse({"error": "POST request required"}, status=405)
+
+    data = json.loads(request.body)
+
+    response, status = seller_login_service(data)
+
+    return JsonResponse(response, status=status)
 
 @csrf_exempt
 @require_POST
@@ -22,26 +27,19 @@ def seller_register(request):
     try:
         data = json.loads(request.body)
 
-        full_name = data.get("full_name")
+        fullname = data.get("fullname")
         email = data.get("email")
         password = data.get("password")
-        confirm_password = data.get("confirm_password")
 
         # ================= VALIDATION =================
         missing = []
-        for field in ["full_name", "email", "password", "confirm_password"]:
+        for field in ["fullname", "email", "password"]:
             if not data.get(field):
                 missing.append(field)
 
         if missing:
             return JsonResponse(
                 {"error": "Missing fields", "fields": missing},
-                status=400
-            )
-
-        if password != confirm_password:
-            return JsonResponse(
-                {"error": "Passwords do not match"},
                 status=400
             )
 
@@ -54,7 +52,7 @@ def seller_register(request):
 
         # ================= SAVE TO DB =================
         seller_doc = {
-            "full_name": full_name,
+            "full_name": fullname,
             "email": email,
             "password": password,  # 🔒 Later hash karenge
             "status": "pending",   # 👈 SUPERADMIN APPROVAL
@@ -94,10 +92,12 @@ def seller_onboarding(request):
     try:
         data = json.loads(request.body)
 
+        print(data)
+
         seller_doc = {
             # STORE INFO
-            "owner_name": data.get("ownerName"),
             "store_name": data.get("storeName"),
+            "owner_name": data.get("ownerName"),
             "store_category": data.get("storeCategory", []),
 
             # KYC
@@ -133,21 +133,3 @@ def seller_onboarding(request):
 
 #seller login API
 
-@csrf_exempt
-def seller_login(request):
-
-    if request.method != "POST":
-        return JsonResponse({"error": "POST request required"}, status=405)
-
-    try:
-        data = json.loads(request.body)
-
-        response, status = seller_login_service(data)
-
-        return JsonResponse(response, status=status)
-
-    except Exception as e:
-        return JsonResponse(
-            {"error": str(e)},
-            status=500
-        )

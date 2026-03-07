@@ -38,7 +38,9 @@ def user_login(request):
                 "id": str(user["_id"]),
                 "name": user.get("name"),
                 "email": user.get("email"),
-                "phone": user.get("phone")
+                "phone": user.get("phone"),
+                "gender": user.get("gender"),
+
             }
         })
 
@@ -73,6 +75,8 @@ def user_register(request):
             "name": name,
             "email": email,
             "password": hashed_password.decode(),
+            "gender": "",
+            "mobile": ""
         })
 
         user_id = str(result.inserted_id)
@@ -87,6 +91,8 @@ def user_register(request):
                 "id": user_id,
                 "name": name,
                 "email": email,
+                "phone": "",
+                "gender": "",
             }
         }, status=201)
 
@@ -100,8 +106,8 @@ def get_profile(request):
     try:
         auth_header = request.headers.get("Authorization")
 
-        if not auth_header.startswith("Bearer "):
-            return JsonResponse({"error": "Invalid token format"}, status=401)
+        if not auth_header:
+            return JsonResponse({"error": "Authorization header missing"}, status=401)
 
         if not auth_header.startswith("Bearer "):
             return JsonResponse({"error": "Invalid token format"}, status=401)
@@ -121,7 +127,6 @@ def get_profile(request):
         if not user_id:
             return JsonResponse({"error": "Invalid token payload"}, status=401)
 
-        # Convert to ObjectId safely
         try:
             user_obj_id = ObjectId(user_id)
         except Exception:
@@ -129,25 +134,22 @@ def get_profile(request):
 
         user = users_collection.find_one({"_id": user_obj_id})
 
-        user = users_collection.find_one({"_id": ObjectId(user_id)})
-
         if not user:
             return JsonResponse({"error": "User not found"}, status=404)
 
         return JsonResponse({
             "id": str(user["_id"]),
-            "firstName": user.get("firstName"),
-            "lastName": user.get("lastName"),
+            "name": user.get("name"),
             "email": user.get("email"),
-            "phone": user.get("phone"),
+            "phone": user.get("mobile"),
             "gender": user.get("gender"),
         })
 
     except Exception as e:
-        print("PROFILE ERROR:", str(e))   # 👈 check terminal
+        print("PROFILE ERROR:", str(e))
         return JsonResponse({"error": "Server error"}, status=500)
 
-print("TOKEN:", token)
+
 # ================= UPDATE PROFILE =================
 @csrf_exempt
 def update_profile(request):
@@ -167,7 +169,7 @@ def update_profile(request):
         data = json.loads(request.body)
 
         users_collection.update_one(
-            {"_id": user_id},
+            {"_id": ObjectId(user_id)},
             {"$set": data}
         )
 
@@ -175,8 +177,38 @@ def update_profile(request):
 
     return JsonResponse({"error": "Invalid method"}, status=405)
 
+@csrf_exempt
+def logout_user(request):
 
-# ================= USER LOGIN =================
+    if request.method != "POST":
+        return JsonResponse({"error": "Invalid request method"}, status=405)
+
+    try:
+        auth_header = request.headers.get("Authorization")
+
+        if not auth_header:
+            return JsonResponse({"error": "Authorization header missing"}, status=401)
+
+        token = auth_header.split(" ")[1]
+
+        decoded = jwt.decode(token, settings.SECRET_KEY, algorithms=["HS256"])
+        user_id = decoded.get("user_id")
+
+        print("DECODED TOKEN:", decoded)
+
+        user_obj_id = ObjectId(user_id)
+
+        users_collection.update_one(
+            {"_id": user_obj_id},
+            {"$set": {"is_active": False}}
+        )
+
+        return JsonResponse({"message": "User logged out successfully"})
+
+    except Exception as e:
+        print("LOGOUT ERROR:", str(e))
+        return JsonResponse({"error": "Server error"}, status=500)
+
 
 # ================= FORGOT PASSWORD =================
 @csrf_exempt

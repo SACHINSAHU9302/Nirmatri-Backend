@@ -78,18 +78,18 @@ class MongoDBConnection:
                 w="majority",
             )
 
-            # ✅ Test connection
+            # Test connection
             self._client.admin.command("ping")
 
             self._db = self._client[db_name]
 
-            logger.info(f"✅ MongoDB connected successfully → DB: {db_name}")
+            logger.info(f" MongoDB connected successfully → DB: {db_name}")
 
         except ConnectionFailure as e:
-            logger.error(f"❌ MongoDB connection failed: {e}")
+            logger.error(f" MongoDB connection failed: {e}")
             raise
         except Exception as e:
-            logger.error(f"❌ Unexpected MongoDB error: {e}")
+            logger.error(f" Unexpected MongoDB error: {e}")
             raise
 
     def get_database(self) -> Database:

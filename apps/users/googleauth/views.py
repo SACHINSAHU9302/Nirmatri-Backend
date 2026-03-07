@@ -1,10 +1,10 @@
 from apps.users.googleauth.services import verify_google_token, get_or_create_google_user
 from rest_framework.response import Response
 from rest_framework.decorators import api_view
-from apps.users.models import GoogleUser
 from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework import status
 from django.conf import settings
+from apps.db.mongo.connection import users_collection
 from datetime import datetime, timedelta
 import jwt
 
@@ -22,9 +22,26 @@ def google_login(request):
 
     user, created = get_or_create_google_user(idinfo)
 
-    # 🔐 CREATE JWT
+    # Save in MongoDB
+    mongo_user = users_collection.find_one({"email": user.email})
+
+    if not mongo_user:
+        result = users_collection.insert_one({
+            "name": user.name,
+            "email": user.email,
+            "mobile": "",
+            "gender": "",
+            "auth_provider": "google",
+            "is_active": True
+        })
+
+        mongo_id = str(result.inserted_id)
+    else:
+        mongo_id = str(mongo_user["_id"])
+
+    # Create JWT using MongoDB id
     payload = {
-        "user_id": str(user.id),
+        "user_id": mongo_id,
         "email": user.email,
         "exp": datetime.utcnow() + timedelta(days=7),
         "iat": datetime.utcnow(),
@@ -35,49 +52,14 @@ def google_login(request):
     return Response({
         "token": jwt_token,
         "user": {
-            "id": user.id,
+            "id": mongo_id,
             "email": user.email,
             "name": user.name,
-            "picture": user.picture
+            "mobile": "",
+            "gender": "",
+            "is_active": True
         }
     })
 
-@api_view(["POST"])
-def google_logout(request):
-    try:
-        refresh_token = request.data.get("refresh")
 
-        if not refresh_token:
-            return Response({"error": "Refresh token required"}, status=400)
-
-        token = RefreshToken(refresh_token)
-        token.blacklist()
-
-        return Response({"message": "Logout successful"})
-
-    except Exception:
-        return Response(
-            {"error": "Invalid token"},
-            status=status.HTTP_400_BAD_REQUEST
-        )
-
-@api_view(["GET"])
-def get_profile(request):
-    email = request.query_params.get("email")
-
-    if not email:
-        return Response({"error": "Email is required"}, status=400)
-
-    try:
-        user = GoogleUser.objects.get(email=email)
-    except GoogleUser.DoesNotExist:
-        return Response({"error": "User not found"}, status=404)
-
-    return Response({
-        "email": user.email,
-        "name": user.name,
-        "picture": user.picture,
-        "auth_provider": user.auth_provider,
-        "created_at": user.created_at
-    })
 

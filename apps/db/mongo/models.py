@@ -224,6 +224,8 @@ DATABASE_SCHEMAS = {
         "role": "buyer | seller | admin",
         "created_at": "datetime",
         "updated_at": "datetime",
+        "mobile": "integer",
+        "gender": "male | female | costume",
     },
     "products": {
         "_id": "ObjectId",
